@@ -1,0 +1,5 @@
+{
+  "name": "CloudPOS Pro",
+  "description": "A modern, cloud-based Point of Sale system with real-time inventory and analytics.",
+  "requestFramePermissions": ["camera"]
+}
