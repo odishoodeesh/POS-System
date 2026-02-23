@@ -13,6 +13,11 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 // Initialize Supabase
 const supabaseUrl = process.env.VITE_SUPABASE_URL || "";
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SUPABASE_ANON_KEY || "";
+
+if (!supabaseUrl) {
+  console.error("CRITICAL: VITE_SUPABASE_URL is not defined in environment variables.");
+}
+
 const supabase = createClient(supabaseUrl, supabaseKey);
 
 const app = express();
@@ -245,60 +250,54 @@ app.post("/api/auth/login", async (req, res) => {
     const { total, tax, discount, payment_method, items, user_id } = req.body;
     
     try {
-      // Start a "transaction" via RPC or multiple calls (Supabase doesn't have multi-table transactions in JS SDK easily without RPC)
-      // For simplicity in this prototype, we'll do sequential calls.
-      
-      const { data: order, error: orderError } = await supabase
-        .from("orders")
-        .insert([{ total, tax, discount, payment_method, user_id }])
-        .select()
-        .single();
+      // Use the atomic RPC function for order placement
+      const { data: receiptId, error } = await supabase.rpc('place_order', {
+        p_total: total,
+        p_tax: tax,
+        p_discount: discount,
+        p_payment_method: payment_method,
+        p_user_id: user_id,
+        p_items: items.map((item: any) => ({
+          id: item.id,
+          quantity: item.quantity,
+          price: item.price
+        }))
+      });
 
-      if (orderError) throw orderError;
-
-      const orderItems = items.map((item: any) => ({
-        order_id: order.id,
-        product_id: item.id,
-        quantity: item.quantity,
-        price: item.price
-      }));
-
-      const { error: itemsError } = await supabase
-        .from("order_items")
-        .insert(orderItems);
-
-      if (itemsError) throw itemsError;
-
-      // Update stock
-      for (const item of items) {
-        const { error: stockError } = await supabase.rpc('decrement_stock', { 
-          row_id: item.id, 
-          amount: item.quantity 
-        });
-        // If RPC doesn't exist, we'd do a manual update, but RPC is safer for concurrency
-        if (stockError) {
-           // Fallback if RPC not defined
-           await supabase
-             .from("products")
-             .update({ stock: item.stock - item.quantity })
-             .eq("id", item.id);
-        }
-      }
-
-      const receiptId = crypto.randomUUID();
-      const { error: receiptError } = await supabase
-        .from("receipts")
-        .insert([{ id: receiptId, order_id: order.id, type: 'customer', status: 'digital_only' }]);
-
-      if (receiptError) throw receiptError;
-
-      const { error: taxError } = await supabase
-        .from("receipt_taxes")
-        .insert([{ receipt_id: receiptId, tax_name: 'VAT', rate: 10, amount: tax }]);
-
-      if (taxError) throw taxError;
+      if (error) throw error;
 
       res.json({ id: receiptId });
+    } catch (err: any) {
+      console.error("Order placement failed:", err);
+      res.status(400).json({ error: err.message });
+    }
+  });
+
+  app.get("/api/reports/stats", async (req, res) => {
+    try {
+      // Get all orders to calculate stats
+      const { data: orders, error } = await supabase
+        .from("orders")
+        .select("total, created_at");
+
+      if (error) throw error;
+
+      const totalRevenue = orders.reduce((sum, o) => sum + Number(o.total), 0);
+      const totalOrders = orders.length;
+      const avgOrderValue = totalOrders > 0 ? totalRevenue / totalOrders : 0;
+      
+      // For simplicity, we'll return hardcoded trends for now or calculate them if we had more data
+      // In a real app, you'd compare with the previous period
+      res.json({
+        totalRevenue,
+        totalOrders,
+        avgOrderValue,
+        newCustomers: 0, // We don't track customers yet
+        revenueTrend: "+12.5%",
+        ordersTrend: "+8.2%",
+        customersTrend: "+5.1%",
+        avgTrend: "-2.4%"
+      });
     } catch (err: any) {
       res.status(400).json({ error: err.message });
     }
@@ -330,6 +329,7 @@ app.post("/api/auth/login", async (req, res) => {
 
   // Vite middleware for development
   if (process.env.NODE_ENV !== "production") {
+    console.log("Starting in development mode with Vite middleware...");
     const { createServer: createViteServer } = await import("vite");
     const vite = await createViteServer({
       server: { middlewareMode: true },
@@ -337,17 +337,21 @@ app.post("/api/auth/login", async (req, res) => {
     });
     app.use(vite.middlewares);
   } else {
-    app.use(express.static(path.join(__dirname, "dist")));
+    console.log("Starting in production mode...");
+    const distPath = path.join(__dirname, "dist");
+    app.use(express.static(distPath));
     app.get("*", (req, res) => {
-      res.sendFile(path.join(__dirname, "dist", "index.html"));
+      res.sendFile(path.join(distPath, "index.html"));
     });
   }
 
   const PORT = Number(process.env.PORT) || 3000;
-  if (process.env.NODE_ENV !== "production") {
-    app.listen(PORT, "0.0.0.0", () => {
-      console.log(`Server running on http://localhost:${PORT}`);
-    });
-  }
+  
+  // Always listen unless explicitly told not to (e.g. in some serverless environments that handle it)
+  // But for standard Node deployments, we need this.
+  app.listen(PORT, "0.0.0.0", () => {
+    console.log(`Server running on port ${PORT}`);
+    console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
+  });
 
 export default app;

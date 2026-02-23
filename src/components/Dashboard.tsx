@@ -27,24 +27,30 @@ import { formatCurrency } from '../utils/format';
 
 export default function Dashboard() {
   const [reportData, setReportData] = useState<any[]>([]);
+  const [statsData, setStatsData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'analytics' | 'settings'>('analytics');
 
   useEffect(() => {
-    fetch('/api/reports/daily')
-      .then(res => res.json())
-      .then(data => {
-        setReportData(data.reverse());
-        setLoading(false);
-      });
+    Promise.all([
+      fetch('/api/reports/daily').then(res => res.json()),
+      fetch('/api/reports/stats').then(res => res.json())
+    ]).then(([daily, stats]) => {
+      setReportData(daily.reverse());
+      setStatsData(stats);
+      setLoading(false);
+    }).catch(err => {
+      console.error("Failed to fetch dashboard data", err);
+      setLoading(false);
+    });
   }, []);
 
-  const stats = [
-    { label: 'Total Revenue', value: formatCurrency(12450000), trend: '+12.5%', icon: DollarSign, color: 'bg-blue-50 text-blue-600' },
-    { label: 'Total Orders', value: '156', trend: '+8.2%', icon: ShoppingBag, color: 'bg-orange-50 text-orange-600' },
-    { label: 'New Customers', value: '42', trend: '+5.1%', icon: Users, color: 'bg-green-50 text-green-600' },
-    { label: 'Avg. Order Value', value: formatCurrency(79800), trend: '-2.4%', icon: TrendingUp, color: 'bg-purple-50 text-purple-600' },
-  ];
+  const stats = statsData ? [
+    { label: 'Total Revenue', value: formatCurrency(statsData.totalRevenue), trend: statsData.revenueTrend, icon: DollarSign, color: 'bg-blue-50 text-blue-600' },
+    { label: 'Total Orders', value: statsData.totalOrders.toString(), trend: statsData.ordersTrend, icon: ShoppingBag, color: 'bg-orange-50 text-orange-600' },
+    { label: 'New Customers', value: statsData.newCustomers.toString(), trend: statsData.customersTrend, icon: Users, color: 'bg-green-50 text-green-600' },
+    { label: 'Avg. Order Value', value: formatCurrency(statsData.avgOrderValue), trend: statsData.avgTrend, icon: TrendingUp, color: 'bg-purple-50 text-purple-600' },
+  ] : [];
 
   if (loading) {
     return (
