@@ -15,21 +15,16 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 // Initialize Supabase
 const supabaseUrl = process.env.VITE_SUPABASE_URL || "";
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SUPABASE_ANON_KEY || "";
-
-if (!supabaseUrl) {
-  console.warn("VITE_SUPABASE_URL is missing");
-}
-
 const supabase = createClient(supabaseUrl, supabaseKey);
 
-// Initialize S3 Client lazily or with guards
+// Initialize S3 Client
 const s3Endpoint = process.env.S3_ENDPOINT || (supabaseUrl ? `${supabaseUrl}/storage/v1/s3` : undefined);
 const s3Client = new S3Client({
   endpoint: s3Endpoint,
   region: process.env.S3_REGION || "us-east-1",
   credentials: {
-    accessKeyId: process.env.S3_ACCESS_KEY_ID || "dummy",
-    secretAccessKey: process.env.S3_SECRET_ACCESS_KEY || "dummy",
+    accessKeyId: process.env.S3_ACCESS_KEY_ID || "",
+    secretAccessKey: process.env.S3_SECRET_ACCESS_KEY || "",
   },
   forcePathStyle: true,
 });
@@ -40,15 +35,6 @@ const app = express();
 app.use(express.json());
 
 // API Routes
-app.get("/api/health", (req, res) => {
-  res.json({ 
-    status: "ok", 
-    timestamp: new Date().toISOString(),
-    env: process.env.NODE_ENV,
-    vercel: !!process.env.VERCEL
-  });
-});
-
 app.post("/api/auth/login", async (req, res) => {
     const { username, password } = req.body;
     const { data: user, error } = await supabase
@@ -408,21 +394,15 @@ app.post("/api/auth/login", async (req, res) => {
     });
     app.use(vite.middlewares);
   } else {
-    const distPath = path.join(__dirname, "dist");
-    app.use(express.static(distPath));
+    app.use(express.static(path.join(__dirname, "dist")));
     app.get("*", (req, res) => {
-      const indexPath = path.join(distPath, "index.html");
-      res.sendFile(indexPath, (err) => {
-        if (err) {
-          res.status(500).send("Frontend build not found. Please run 'npm run build' first.");
-        }
-      });
+      res.sendFile(path.join(__dirname, "dist", "index.html"));
     });
   }
 
   const PORT = Number(process.env.PORT) || 3000;
   // In Vercel, we don't call listen, we export the app
-  if (!process.env.VERCEL && process.env.NODE_ENV !== "test") {
+  if (!process.env.VERCEL) {
     app.listen(PORT, "0.0.0.0", () => {
       console.log(`Server running on http://localhost:${PORT}`);
     });
