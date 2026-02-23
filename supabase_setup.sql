@@ -96,9 +96,9 @@ CREATE TABLE IF NOT EXISTS print_logs (
 
 -- SEED DATA
 
--- Initial User (admin/admin)
+-- Initial User (admin/password)
 INSERT INTO users (username, password, role, pin) 
-VALUES ('admin', 'admin', 'owner', '1234')
+VALUES ('admin', 'password', 'owner', '1234')
 ON CONFLICT (username) DO NOTHING;
 
 -- Initial Categories
