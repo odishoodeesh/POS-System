@@ -17,10 +17,9 @@ interface LayoutProps {
   user: User;
   currentView: 'pos' | 'inventory' | 'dashboard' | 'transactions';
   setView: (view: 'pos' | 'inventory' | 'dashboard' | 'transactions') => void;
-  onLogout: () => void;
 }
 
-export default function Layout({ children, user, currentView, setView, onLogout }: LayoutProps) {
+export default function Layout({ children, user, currentView, setView }: LayoutProps) {
   const menuItems = [
     { id: 'pos', label: 'Terminal', icon: ShoppingBag },
     { id: 'inventory', label: 'Inventory', icon: Package },
@@ -65,7 +64,7 @@ export default function Layout({ children, user, currentView, setView, onLogout 
         </nav>
 
         <div className="p-4 mt-auto border-t border-gray-100">
-          <div className="flex items-center gap-3 px-2 mb-4 hidden lg:flex">
+          <div className="flex items-center gap-3 px-2 hidden lg:flex">
             <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-gray-600 font-bold text-xs">
               {user.username[0].toUpperCase()}
             </div>
@@ -74,13 +73,6 @@ export default function Layout({ children, user, currentView, setView, onLogout 
               <p className="text-xs text-gray-400 capitalize">{user.role}</p>
             </div>
           </div>
-          <button
-            onClick={onLogout}
-            className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-red-500 hover:bg-red-50 transition-all group"
-          >
-            <LogOut size={20} />
-            <span className="font-medium hidden lg:block">Logout</span>
-          </button>
         </div>
       </aside>
 
