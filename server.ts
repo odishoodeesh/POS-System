@@ -155,6 +155,8 @@ app.post("/api/auth/login", async (req, res) => {
 
   app.post("/api/categories", async (req, res) => {
     const { name } = req.body;
+    if (!name) return res.status(400).json({ error: "Category name is required" });
+
     const { data, error } = await supabase
       .from("categories")
       .insert([{ name }])
@@ -167,6 +169,8 @@ app.post("/api/auth/login", async (req, res) => {
 
   app.put("/api/categories/:id", async (req, res) => {
     const { name } = req.body;
+    if (!name) return res.status(400).json({ error: "Category name is required" });
+
     const { data, error } = await supabase
       .from("categories")
       .update({ name })
