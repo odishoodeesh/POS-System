@@ -27,11 +27,7 @@ export default function Transactions() {
 
   const fetchData = async () => {
     try {
-      // In a real app, this would be a paginated API
-      // For now, we'll just fetch the latest orders and their receipts
-      const res = await fetch('/api/reports/daily'); // This is just a placeholder for now
-      // Let's assume we have a /api/receipts endpoint
-      const receiptsRes = await fetch('/api/receipts/list'); // I need to create this
+      const receiptsRes = await fetch('/api/receipts/list');
       const data = await receiptsRes.json();
       setReceipts(data);
     } catch (err) {
