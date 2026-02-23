@@ -5,10 +5,25 @@ import path from "path";
 import { fileURLToPath } from "url";
 import crypto from "crypto";
 import dotenv from "dotenv";
+import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
+import multer from "multer";
 
 dotenv.config();
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
+// Initialize S3 Client
+const s3Client = new S3Client({
+  endpoint: process.env.S3_ENDPOINT,
+  region: process.env.S3_REGION || "eu-central-1",
+  credentials: {
+    accessKeyId: process.env.S3_ACCESS_KEY_ID || "",
+    secretAccessKey: process.env.S3_SECRET_ACCESS_KEY || "",
+  },
+  forcePathStyle: true,
+});
+
+const upload = multer({ storage: multer.memoryStorage() });
 
 // Initialize Supabase
 const supabaseUrl = process.env.VITE_SUPABASE_URL || "";
@@ -36,6 +51,43 @@ app.post("/api/auth/login", async (req, res) => {
     }
   });
 
+  app.post("/api/upload", upload.single("image"), async (req, res) => {
+    if (!req.file) return res.status(400).json({ error: "No file uploaded" });
+
+    const file = req.file;
+    const fileExt = file.originalname.split(".").pop();
+    const fileName = `${crypto.randomUUID()}.${fileExt}`;
+    const bucketName = process.env.S3_BUCKET_NAME || "product-images";
+
+    try {
+      const command = new PutObjectCommand({
+        Bucket: bucketName,
+        Key: fileName,
+        Body: file.buffer,
+        ContentType: file.mimetype,
+      });
+
+      await s3Client.send(command);
+
+      // Construct public URL
+      // For Supabase, the public URL format is:
+      // https://[project-id].supabase.co/storage/v1/object/public/[bucket]/[filename]
+      let publicUrl = "";
+      if (supabaseUrl.includes("supabase.co")) {
+        const projectId = supabaseUrl.split("//")[1].split(".")[0];
+        publicUrl = `https://${projectId}.supabase.co/storage/v1/object/public/${bucketName}/${fileName}`;
+      } else {
+        // Fallback or custom domain handling if needed
+        publicUrl = `${supabaseUrl}/storage/v1/object/public/${bucketName}/${fileName}`;
+      }
+
+      res.json({ url: publicUrl });
+    } catch (err: any) {
+      console.error("Upload failed", err);
+      res.status(500).json({ error: err.message });
+    }
+  });
+
   app.get("/api/products", async (req, res) => {
     const { data: products, error } = await supabase
       .from("products")
@@ -58,10 +110,10 @@ app.post("/api/auth/login", async (req, res) => {
   });
 
   app.post("/api/products", async (req, res) => {
-    const { name, sku, price, cost, stock, category_id } = req.body;
+    const { name, sku, price, cost, stock, category_id, image_url } = req.body;
     const { data, error } = await supabase
       .from("products")
-      .insert([{ name, sku, price, cost, stock, category_id }])
+      .insert([{ name, sku, price, cost, stock, category_id, image_url }])
       .select()
       .single();
 
@@ -70,10 +122,10 @@ app.post("/api/auth/login", async (req, res) => {
   });
 
   app.put("/api/products/:id", async (req, res) => {
-    const { name, sku, price, cost, stock, category_id } = req.body;
+    const { name, sku, price, cost, stock, category_id, image_url } = req.body;
     const { data, error } = await supabase
       .from("products")
-      .update({ name, sku, price, cost, stock, category_id })
+      .update({ name, sku, price, cost, stock, category_id, image_url })
       .eq("id", req.params.id)
       .select()
       .single();

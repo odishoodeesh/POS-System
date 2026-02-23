@@ -11,7 +11,9 @@ import {
   X,
   Loader2,
   Package,
-  Scan
+  Scan,
+  Image as ImageIcon,
+  Upload
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { formatCurrency } from '../utils/format';
@@ -45,8 +47,10 @@ export default function Inventory() {
     price: '',
     cost: '',
     stock: '',
-    category_id: ''
+    category_id: '',
+    image_url: ''
   });
+  const [uploading, setUploading] = useState(false);
 
   useEffect(() => {
     fetchData();
@@ -67,6 +71,30 @@ export default function Inventory() {
     }
   };
 
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setUploading(true);
+    const formDataUpload = new FormData();
+    formDataUpload.append('image', file);
+
+    try {
+      const res = await fetch('/api/upload', {
+        method: 'POST',
+        body: formDataUpload,
+      });
+      const data = await res.json();
+      if (data.url) {
+        setFormData(prev => ({ ...prev, image_url: data.url }));
+      }
+    } catch (err) {
+      console.error('Upload failed', err);
+    } finally {
+      setUploading(false);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -82,7 +110,8 @@ export default function Inventory() {
           price: parseFloat(formData.price),
           cost: parseFloat(formData.cost),
           stock: parseInt(formData.stock),
-          category_id: parseInt(formData.category_id)
+          category_id: parseInt(formData.category_id),
+          image_url: formData.image_url
         }),
       });
 
@@ -125,7 +154,8 @@ export default function Inventory() {
       price: product.price.toString(),
       cost: product.cost.toString(),
       stock: product.stock.toString(),
-      category_id: product.category_id.toString()
+      category_id: product.category_id.toString(),
+      image_url: product.image_url || ''
     });
     setIsAdding(true);
   };
@@ -206,8 +236,12 @@ export default function Inventory() {
                 <tr key={product.id} className="hover:bg-gray-50 transition-colors group">
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-lg bg-gray-100 flex items-center justify-center text-gray-400">
-                        <Package size={20} />
+                      <div className="w-10 h-10 rounded-lg bg-gray-100 flex items-center justify-center text-gray-400 overflow-hidden">
+                        {product.image_url ? (
+                          <img src={product.image_url} alt={product.name} className="w-full h-full object-cover" />
+                        ) : (
+                          <Package size={20} />
+                        )}
                       </div>
                       <span className="font-bold text-gray-900">{product.name}</span>
                     </div>
@@ -349,6 +383,35 @@ export default function Inventory() {
                     />
                   </div>
                   
+                  <div className="col-span-2">
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Product Image</label>
+                    <div className="flex items-center gap-4">
+                      <div className="w-24 h-24 rounded-2xl bg-gray-50 border-2 border-dashed border-gray-200 flex items-center justify-center overflow-hidden relative group">
+                        {formData.image_url ? (
+                          <img src={formData.image_url} alt="Preview" className="w-full h-full object-cover" />
+                        ) : uploading ? (
+                          <Loader2 className="animate-spin text-gray-400" />
+                        ) : (
+                          <ImageIcon size={32} className="text-gray-300" />
+                        )}
+                        <label className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center cursor-pointer">
+                          <Upload size={20} className="text-white" />
+                          <input type="file" accept="image/*" className="hidden" onChange={handleImageUpload} />
+                        </label>
+                      </div>
+                      <div className="flex-1">
+                        <p className="text-xs text-gray-500 mb-2">Upload a product photo. Recommended size: 512x512px.</p>
+                        <input
+                          type="text"
+                          placeholder="Or paste image URL..."
+                          value={formData.image_url}
+                          onChange={e => setFormData({ ...formData, image_url: e.target.value })}
+                          className="w-full px-4 py-2 text-sm rounded-lg border border-gray-200 focus:ring-2 focus:ring-black outline-none transition-all"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
                   <div className="col-span-2 pt-4">
                     <button
                       type="submit"
