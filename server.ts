@@ -12,10 +12,16 @@ dotenv.config();
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
+// Initialize Supabase
+const supabaseUrl = process.env.VITE_SUPABASE_URL || "";
+const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SUPABASE_ANON_KEY || "";
+const supabase = createClient(supabaseUrl, supabaseKey);
+
 // Initialize S3 Client
+const s3Endpoint = process.env.S3_ENDPOINT || (supabaseUrl ? `${supabaseUrl}/storage/v1/s3` : undefined);
 const s3Client = new S3Client({
-  endpoint: process.env.S3_ENDPOINT,
-  region: process.env.S3_REGION || "eu-central-1",
+  endpoint: s3Endpoint,
+  region: process.env.S3_REGION || "us-east-1",
   credentials: {
     accessKeyId: process.env.S3_ACCESS_KEY_ID || "",
     secretAccessKey: process.env.S3_SECRET_ACCESS_KEY || "",
@@ -24,11 +30,6 @@ const s3Client = new S3Client({
 });
 
 const upload = multer({ storage: multer.memoryStorage() });
-
-// Initialize Supabase
-const supabaseUrl = process.env.VITE_SUPABASE_URL || "";
-const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SUPABASE_ANON_KEY || "";
-const supabase = createClient(supabaseUrl, supabaseKey);
 
 const app = express();
 app.use(express.json());
@@ -400,7 +401,8 @@ app.post("/api/auth/login", async (req, res) => {
   }
 
   const PORT = Number(process.env.PORT) || 3000;
-  if (process.env.NODE_ENV !== "production") {
+  // In Vercel, we don't call listen, we export the app
+  if (!process.env.VERCEL) {
     app.listen(PORT, "0.0.0.0", () => {
       console.log(`Server running on http://localhost:${PORT}`);
     });
