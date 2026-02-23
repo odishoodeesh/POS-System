@@ -28,8 +28,8 @@ const s3Client = new S3Client({
   endpoint: s3Endpoint,
   region: process.env.S3_REGION || "us-east-1",
   credentials: {
-    accessKeyId: process.env.S3_ACCESS_KEY_ID || "dummy",
-    secretAccessKey: process.env.S3_SECRET_ACCESS_KEY || "dummy",
+    accessKeyId: process.env.S3_ACCESS_KEY_ID || process.env.AWS_ACCESS_KEY_ID || "dummy",
+    secretAccessKey: process.env.S3_SECRET_ACCESS_KEY || process.env.AWS_SECRET_ACCESS_KEY || "dummy",
   },
   forcePathStyle: true,
 });
