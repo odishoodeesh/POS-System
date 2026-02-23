@@ -46,20 +46,16 @@ export default function Categories() {
       const response = await fetch(url, {
         method,
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: currentCategory.name }),
+        body: JSON.stringify(currentCategory),
       });
 
       if (response.ok) {
         await fetchCategories();
         setIsEditing(false);
         setCurrentCategory({});
-      } else {
-        const errorData = await response.json();
-        alert(`Error: ${errorData.error || 'Failed to save category'}`);
       }
     } catch (err) {
       console.error('Failed to save category', err);
-      alert('Network error. Please try again.');
     } finally {
       setSaving(false);
     }

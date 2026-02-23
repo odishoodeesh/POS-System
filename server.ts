@@ -5,8 +5,6 @@ import path from "path";
 import { fileURLToPath } from "url";
 import crypto from "crypto";
 import dotenv from "dotenv";
-import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
-import multer from "multer";
 
 dotenv.config();
 
@@ -15,40 +13,12 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 // Initialize Supabase
 const supabaseUrl = process.env.VITE_SUPABASE_URL || "";
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SUPABASE_ANON_KEY || "";
-
-if (!supabaseUrl) {
-  console.warn("VITE_SUPABASE_URL is missing");
-}
-
 const supabase = createClient(supabaseUrl, supabaseKey);
-
-// Initialize S3 Client lazily or with guards
-const s3Endpoint = process.env.S3_ENDPOINT || (supabaseUrl ? `${supabaseUrl}/storage/v1/s3` : undefined);
-const s3Client = new S3Client({
-  endpoint: s3Endpoint,
-  region: process.env.S3_REGION || "us-east-1",
-  credentials: {
-    accessKeyId: process.env.S3_ACCESS_KEY_ID || process.env.AWS_ACCESS_KEY_ID || "dummy",
-    secretAccessKey: process.env.S3_SECRET_ACCESS_KEY || process.env.AWS_SECRET_ACCESS_KEY || "dummy",
-  },
-  forcePathStyle: true,
-});
-
-const upload = multer({ storage: multer.memoryStorage() });
 
 const app = express();
 app.use(express.json());
 
 // API Routes
-app.get("/api/health", (req, res) => {
-  res.json({ 
-    status: "ok", 
-    timestamp: new Date().toISOString(),
-    env: process.env.NODE_ENV,
-    vercel: !!process.env.VERCEL
-  });
-});
-
 app.post("/api/auth/login", async (req, res) => {
     const { username, password } = req.body;
     const { data: user, error } = await supabase
@@ -63,43 +33,6 @@ app.post("/api/auth/login", async (req, res) => {
       res.json(userWithoutPassword);
     } else {
       res.status(401).json({ error: "Invalid credentials" });
-    }
-  });
-
-  app.post("/api/upload", upload.single("image"), async (req, res) => {
-    if (!req.file) return res.status(400).json({ error: "No file uploaded" });
-
-    const file = req.file;
-    const fileExt = file.originalname.split(".").pop();
-    const fileName = `${crypto.randomUUID()}.${fileExt}`;
-    const bucketName = process.env.S3_BUCKET_NAME || "product-images";
-
-    try {
-      const command = new PutObjectCommand({
-        Bucket: bucketName,
-        Key: fileName,
-        Body: file.buffer,
-        ContentType: file.mimetype,
-      });
-
-      await s3Client.send(command);
-
-      // Construct public URL
-      // For Supabase, the public URL format is:
-      // https://[project-id].supabase.co/storage/v1/object/public/[bucket]/[filename]
-      let publicUrl = "";
-      if (supabaseUrl.includes("supabase.co")) {
-        const projectId = supabaseUrl.split("//")[1].split(".")[0];
-        publicUrl = `https://${projectId}.supabase.co/storage/v1/object/public/${bucketName}/${fileName}`;
-      } else {
-        // Fallback or custom domain handling if needed
-        publicUrl = `${supabaseUrl}/storage/v1/object/public/${bucketName}/${fileName}`;
-      }
-
-      res.json({ url: publicUrl });
-    } catch (err: any) {
-      console.error("Upload failed", err);
-      res.status(500).json({ error: err.message });
     }
   });
 
@@ -125,10 +58,10 @@ app.post("/api/auth/login", async (req, res) => {
   });
 
   app.post("/api/products", async (req, res) => {
-    const { name, sku, price, cost, stock, category_id, image_url } = req.body;
+    const { name, sku, price, cost, stock, category_id } = req.body;
     const { data, error } = await supabase
       .from("products")
-      .insert([{ name, sku, price, cost, stock, category_id, image_url }])
+      .insert([{ name, sku, price, cost, stock, category_id }])
       .select()
       .single();
 
@@ -137,10 +70,10 @@ app.post("/api/auth/login", async (req, res) => {
   });
 
   app.put("/api/products/:id", async (req, res) => {
-    const { name, sku, price, cost, stock, category_id, image_url } = req.body;
+    const { name, sku, price, cost, stock, category_id } = req.body;
     const { data, error } = await supabase
       .from("products")
-      .update({ name, sku, price, cost, stock, category_id, image_url })
+      .update({ name, sku, price, cost, stock, category_id })
       .eq("id", req.params.id)
       .select()
       .single();
@@ -170,8 +103,6 @@ app.post("/api/auth/login", async (req, res) => {
 
   app.post("/api/categories", async (req, res) => {
     const { name } = req.body;
-    if (!name) return res.status(400).json({ error: "Category name is required" });
-
     const { data, error } = await supabase
       .from("categories")
       .insert([{ name }])
@@ -184,8 +115,6 @@ app.post("/api/auth/login", async (req, res) => {
 
   app.put("/api/categories/:id", async (req, res) => {
     const { name } = req.body;
-    if (!name) return res.status(400).json({ error: "Category name is required" });
-
     const { data, error } = await supabase
       .from("categories")
       .update({ name })
@@ -408,21 +337,14 @@ app.post("/api/auth/login", async (req, res) => {
     });
     app.use(vite.middlewares);
   } else {
-    const distPath = path.join(__dirname, "dist");
-    app.use(express.static(distPath));
+    app.use(express.static(path.join(__dirname, "dist")));
     app.get("*", (req, res) => {
-      const indexPath = path.join(distPath, "index.html");
-      res.sendFile(indexPath, (err) => {
-        if (err) {
-          res.status(500).send("Frontend build not found. Please run 'npm run build' first.");
-        }
-      });
+      res.sendFile(path.join(__dirname, "dist", "index.html"));
     });
   }
 
   const PORT = Number(process.env.PORT) || 3000;
-  // In Vercel, we don't call listen, we export the app
-  if (!process.env.VERCEL && process.env.NODE_ENV !== "test") {
+  if (process.env.NODE_ENV !== "production") {
     app.listen(PORT, "0.0.0.0", () => {
       console.log(`Server running on http://localhost:${PORT}`);
     });
