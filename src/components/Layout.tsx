@@ -4,6 +4,7 @@ import {
   LayoutDashboard, 
   ShoppingBag, 
   Package, 
+  Tag,
   Users, 
   Settings, 
   LogOut,
@@ -15,14 +16,15 @@ import { motion } from 'motion/react';
 interface LayoutProps {
   children: ReactNode;
   user: User;
-  currentView: 'pos' | 'inventory' | 'dashboard' | 'transactions';
-  setView: (view: 'pos' | 'inventory' | 'dashboard' | 'transactions') => void;
+  currentView: 'pos' | 'inventory' | 'categories' | 'dashboard' | 'transactions';
+  setView: (view: 'pos' | 'inventory' | 'categories' | 'dashboard' | 'transactions') => void;
 }
 
 export default function Layout({ children, user, currentView, setView }: LayoutProps) {
   const menuItems = [
     { id: 'pos', label: 'Terminal', icon: ShoppingBag },
     { id: 'inventory', label: 'Inventory', icon: Package },
+    { id: 'categories', label: 'Categories', icon: Tag },
     { id: 'transactions', label: 'Transactions', icon: History },
     { id: 'dashboard', label: 'Analytics', icon: LayoutDashboard },
   ];

@@ -101,6 +101,41 @@ app.post("/api/auth/login", async (req, res) => {
     res.json(categories);
   });
 
+  app.post("/api/categories", async (req, res) => {
+    const { name } = req.body;
+    const { data, error } = await supabase
+      .from("categories")
+      .insert([{ name }])
+      .select()
+      .single();
+
+    if (error) return res.status(400).json({ error: error.message });
+    res.json(data);
+  });
+
+  app.put("/api/categories/:id", async (req, res) => {
+    const { name } = req.body;
+    const { data, error } = await supabase
+      .from("categories")
+      .update({ name })
+      .eq("id", req.params.id)
+      .select()
+      .single();
+
+    if (error) return res.status(400).json({ error: error.message });
+    res.json({ success: true, data });
+  });
+
+  app.delete("/api/categories/:id", async (req, res) => {
+    const { error } = await supabase
+      .from("categories")
+      .delete()
+      .eq("id", req.params.id);
+
+    if (error) return res.status(400).json({ error: error.message });
+    res.json({ success: true });
+  });
+
   app.get("/api/receipt-settings", async (req, res) => {
     const { data: settings, error } = await supabase
       .from("receipt_settings")
