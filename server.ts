@@ -1,141 +1,19 @@
 import express from "express";
 import { createServer as createViteServer } from "vite";
-import Database from "better-sqlite3";
+import { createClient } from "@supabase/supabase-js";
 import path from "path";
 import { fileURLToPath } from "url";
 import crypto from "crypto";
+import dotenv from "dotenv";
+
+dotenv.config();
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const db = new Database("pos.db");
 
-// Initialize Database
-db.exec(`
-  CREATE TABLE IF NOT EXISTS users (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    username TEXT UNIQUE,
-    password TEXT,
-    role TEXT,
-    pin TEXT
-  );
-
-  CREATE TABLE IF NOT EXISTS categories (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    name TEXT UNIQUE
-  );
-
-  CREATE TABLE IF NOT EXISTS products (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    name TEXT,
-    sku TEXT UNIQUE,
-    price REAL,
-    cost REAL,
-    stock INTEGER,
-    category_id INTEGER,
-    image_url TEXT,
-    FOREIGN KEY (category_id) REFERENCES categories(id)
-  );
-
-  CREATE TABLE IF NOT EXISTS orders (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    total REAL,
-    tax REAL,
-    discount REAL,
-    payment_method TEXT,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    user_id INTEGER,
-    FOREIGN KEY (user_id) REFERENCES users(id)
-  );
-
-  CREATE TABLE IF NOT EXISTS order_items (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    order_id INTEGER,
-    product_id INTEGER,
-    quantity INTEGER,
-    price REAL,
-    FOREIGN KEY (order_id) REFERENCES orders(id),
-    FOREIGN KEY (product_id) REFERENCES products(id)
-  );
-
-  CREATE TABLE IF NOT EXISTS receipt_settings (
-    id INTEGER PRIMARY KEY CHECK (id = 1),
-    business_name TEXT,
-    branch_name TEXT,
-    address TEXT,
-    phone TEXT,
-    tax_id TEXT,
-    logo_url TEXT,
-    footer_message TEXT,
-    return_policy TEXT,
-    show_tax INTEGER DEFAULT 1,
-    show_cashier INTEGER DEFAULT 1,
-    show_sku INTEGER DEFAULT 1,
-    font_size TEXT DEFAULT 'medium'
-  );
-
-  CREATE TABLE IF NOT EXISTS receipts (
-    id TEXT PRIMARY KEY,
-    order_id INTEGER,
-    type TEXT, -- customer, merchant, kitchen, refund, gift_card
-    status TEXT, -- printed, digital_only
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (order_id) REFERENCES orders(id)
-  );
-
-  CREATE TABLE IF NOT EXISTS receipt_taxes (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    receipt_id TEXT,
-    tax_name TEXT,
-    rate REAL,
-    amount REAL,
-    FOREIGN KEY (receipt_id) REFERENCES receipts(id)
-  );
-
-  CREATE TABLE IF NOT EXISTS print_logs (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    receipt_id TEXT,
-    user_id INTEGER,
-    print_type TEXT,
-    status TEXT,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (receipt_id) REFERENCES receipts(id),
-    FOREIGN KEY (user_id) REFERENCES users(id)
-  );
-`);
-
-// Seed initial receipt settings
-const settingsCount = db.prepare("SELECT count(*) as count FROM receipt_settings").get() as { count: number };
-if (settingsCount.count === 0) {
-  db.prepare(`
-    INSERT INTO receipt_settings (
-      id, business_name, branch_name, address, phone, tax_id, footer_message, return_policy
-    ) VALUES (1, ?, ?, ?, ?, ?, ?, ?)
-  `).run(
-    "CloudPOS Coffee Co.",
-    "Downtown Branch",
-    "123 Innovation Way, Tech City",
-    "+1 (555) 000-1234",
-    "VAT-987654321",
-    "Thank you for your business!",
-    "Returns accepted within 30 days with receipt."
-  );
-}
-
-// Seed initial data if empty
-const userCount = db.prepare("SELECT count(*) as count FROM users").get() as { count: number };
-if (userCount.count === 0) {
-  db.prepare("INSERT INTO users (username, password, role, pin) VALUES (?, ?, ?, ?)").run("admin", "admin", "owner", "1234");
-  db.prepare("INSERT INTO categories (name) VALUES (?)").run("Beverages");
-  db.prepare("INSERT INTO categories (name) VALUES (?)").run("Food");
-  db.prepare("INSERT INTO categories (name) VALUES (?)").run("Merchandise");
-  
-  const beveragesId = (db.prepare("SELECT id FROM categories WHERE name = ?").get("Beverages") as any).id;
-  db.prepare("INSERT INTO products (name, sku, price, cost, stock, category_id) VALUES (?, ?, ?, ?, ?, ?)").run("Espresso", "COF-001", 3000, 500, 100, beveragesId);
-  db.prepare("INSERT INTO products (name, sku, price, cost, stock, category_id) VALUES (?, ?, ?, ?, ?, ?)").run("Latte", "COF-002", 4500, 800, 100, beveragesId);
-  db.prepare("INSERT INTO products (name, sku, price, cost, stock, category_id) VALUES (?, ?, ?, ?, ?, ?)").run("Cappuccino", "COF-003", 4250, 750, 100, beveragesId);
-  db.prepare("INSERT INTO products (name, sku, price, cost, stock, category_id) VALUES (?, ?, ?, ?, ?, ?)").run("Croissant", "FOD-001", 3750, 1200, 50, (db.prepare("SELECT id FROM categories WHERE name = ?").get("Food") as any).id);
-  db.prepare("INSERT INTO products (name, sku, price, cost, stock, category_id) VALUES (?, ?, ?, ?, ?, ?)").run("Muffin", "FOD-002", 3250, 900, 40, (db.prepare("SELECT id FROM categories WHERE name = ?").get("Food") as any).id);
-  db.prepare("INSERT INTO products (name, sku, price, cost, stock, category_id) VALUES (?, ?, ?, ?, ?, ?)").run("CloudPOS Tee", "MER-001", 25000, 10000, 20, (db.prepare("SELECT id FROM categories WHERE name = ?").get("Merchandise") as any).id);
-}
+// Initialize Supabase
+const supabaseUrl = process.env.VITE_SUPABASE_URL || "";
+const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SUPABASE_ANON_KEY || "";
+const supabase = createClient(supabaseUrl, supabaseKey);
 
 async function startServer() {
   const app = express();
@@ -144,9 +22,15 @@ async function startServer() {
   app.use(express.json());
 
   // API Routes
-  app.post("/api/auth/login", (req, res) => {
+  app.post("/api/auth/login", async (req, res) => {
     const { username, password } = req.body;
-    const user = db.prepare("SELECT * FROM users WHERE username = ? AND password = ?").get(username, password) as any;
+    const { data: user, error } = await supabase
+      .from("users")
+      .select("*")
+      .eq("username", username)
+      .eq("password", password)
+      .single();
+
     if (user) {
       const { password, ...userWithoutPassword } = user;
       res.json(userWithoutPassword);
@@ -155,144 +39,261 @@ async function startServer() {
     }
   });
 
-  app.get("/api/products", (req, res) => {
-    const products = db.prepare(`
-      SELECT p.*, c.name as category_name 
-      FROM products p 
-      LEFT JOIN categories c ON p.category_id = c.id
-    `).all();
-    res.json(products);
+  app.get("/api/products", async (req, res) => {
+    const { data: products, error } = await supabase
+      .from("products")
+      .select(`
+        *,
+        categories (
+          name
+        )
+      `);
+    
+    if (error) return res.status(400).json({ error: error.message });
+    
+    // Flatten category name to match previous API structure
+    const flattened = products.map(p => ({
+      ...p,
+      category_name: p.categories?.name
+    }));
+    
+    res.json(flattened);
   });
 
-  app.post("/api/products", (req, res) => {
+  app.post("/api/products", async (req, res) => {
     const { name, sku, price, cost, stock, category_id } = req.body;
-    try {
-      const result = db.prepare("INSERT INTO products (name, sku, price, cost, stock, category_id) VALUES (?, ?, ?, ?, ?, ?)").run(name, sku, price, cost, stock, category_id);
-      res.json({ id: result.lastInsertRowid });
-    } catch (err: any) {
-      res.status(400).json({ error: err.message });
-    }
+    const { data, error } = await supabase
+      .from("products")
+      .insert([{ name, sku, price, cost, stock, category_id }])
+      .select()
+      .single();
+
+    if (error) return res.status(400).json({ error: error.message });
+    res.json(data);
   });
 
-  app.put("/api/products/:id", (req, res) => {
+  app.put("/api/products/:id", async (req, res) => {
     const { name, sku, price, cost, stock, category_id } = req.body;
-    try {
-      db.prepare(`
-        UPDATE products SET 
-          name = ?, sku = ?, price = ?, cost = ?, stock = ?, category_id = ?
-        WHERE id = ?
-      `).run(name, sku, price, cost, stock, category_id, req.params.id);
-      res.json({ success: true });
-    } catch (err: any) {
-      res.status(400).json({ error: err.message });
-    }
+    const { data, error } = await supabase
+      .from("products")
+      .update({ name, sku, price, cost, stock, category_id })
+      .eq("id", req.params.id)
+      .select()
+      .single();
+
+    if (error) return res.status(400).json({ error: error.message });
+    res.json({ success: true, data });
   });
 
-  app.delete("/api/products/:id", (req, res) => {
-    try {
-      db.prepare("DELETE FROM products WHERE id = ?").run(req.params.id);
-      res.json({ success: true });
-    } catch (err: any) {
-      res.status(400).json({ error: err.message });
-    }
-  });
+  app.delete("/api/products/:id", async (req, res) => {
+    const { error } = await supabase
+      .from("products")
+      .delete()
+      .eq("id", req.params.id);
 
-  app.get("/api/categories", (req, res) => {
-    const categories = db.prepare("SELECT * FROM categories").all();
-    res.json(categories);
-  });
-
-  app.get("/api/receipt-settings", (req, res) => {
-    const settings = db.prepare("SELECT * FROM receipt_settings WHERE id = 1").get();
-    res.json(settings);
-  });
-
-  app.post("/api/receipt-settings", (req, res) => {
-    const { business_name, branch_name, address, phone, tax_id, footer_message, return_policy, show_tax, show_cashier, show_sku, font_size } = req.body;
-    db.prepare(`
-      UPDATE receipt_settings SET 
-        business_name = ?, branch_name = ?, address = ?, phone = ?, tax_id = ?, 
-        footer_message = ?, return_policy = ?, show_tax = ?, show_cashier = ?, 
-        show_sku = ?, font_size = ?
-      WHERE id = 1
-    `).run(business_name, branch_name, address, phone, tax_id, footer_message, return_policy, show_tax, show_cashier, show_sku, font_size);
+    if (error) return res.status(400).json({ error: error.message });
     res.json({ success: true });
   });
 
-  app.get("/api/receipts/list", (req, res) => {
-    const receipts = db.prepare(`
-      SELECT r.*, o.total, o.created_at as order_date
-      FROM receipts r
-      JOIN orders o ON r.order_id = o.id
-      ORDER BY r.created_at DESC
-      LIMIT 50
-    `).all();
-    res.json(receipts);
-  });
-
-  app.get("/api/receipts/:id", (req, res) => {
-    const receipt = db.prepare(`
-      SELECT r.*, o.total, o.tax, o.discount, o.payment_method, u.username as cashier_name
-      FROM receipts r
-      JOIN orders o ON r.order_id = o.id
-      JOIN users u ON o.user_id = u.id
-      WHERE r.id = ?
-    `).get(req.params.id) as any;
-
-    if (!receipt) return res.status(404).json({ error: "Receipt not found" });
-
-    const items = db.prepare(`
-      SELECT oi.*, p.name, p.sku
-      FROM order_items oi
-      JOIN products p ON oi.product_id = p.id
-      WHERE oi.order_id = ?
-    `).all(receipt.order_id);
-
-    const taxes = db.prepare("SELECT * FROM receipt_taxes WHERE receipt_id = ?").all(receipt.id);
-
-    res.json({ ...receipt, items, taxes });
-  });
-
-  // Update order creation to generate receipt
-  app.post("/api/orders", (req, res) => {
-    const { total, tax, discount, payment_method, items, user_id } = req.body;
-    const receiptId = crypto.randomUUID();
+  app.get("/api/categories", async (req, res) => {
+    const { data: categories, error } = await supabase
+      .from("categories")
+      .select("*");
     
-    const transaction = db.transaction(() => {
-      const orderResult = db.prepare("INSERT INTO orders (total, tax, discount, payment_method, user_id) VALUES (?, ?, ?, ?, ?)").run(total, tax, discount, payment_method, user_id);
-      const orderId = orderResult.lastInsertRowid;
+    if (error) return res.status(400).json({ error: error.message });
+    res.json(categories);
+  });
 
+  app.get("/api/receipt-settings", async (req, res) => {
+    const { data: settings, error } = await supabase
+      .from("receipt_settings")
+      .select("*")
+      .eq("id", 1)
+      .single();
+    
+    if (error) return res.status(400).json({ error: error.message });
+    res.json(settings);
+  });
+
+  app.post("/api/receipt-settings", async (req, res) => {
+    const { business_name, branch_name, address, phone, tax_id, footer_message, return_policy, show_tax, show_cashier, show_sku, font_size } = req.body;
+    const { error } = await supabase
+      .from("receipt_settings")
+      .update({ 
+        business_name, branch_name, address, phone, tax_id, 
+        footer_message, return_policy, show_tax, show_cashier, 
+        show_sku, font_size 
+      })
+      .eq("id", 1);
+
+    if (error) return res.status(400).json({ error: error.message });
+    res.json({ success: true });
+  });
+
+  app.get("/api/receipts/list", async (req, res) => {
+    const { data: receipts, error } = await supabase
+      .from("receipts")
+      .select(`
+        *,
+        orders (
+          total,
+          created_at
+        )
+      `)
+      .order("created_at", { ascending: false })
+      .limit(50);
+
+    if (error) return res.status(400).json({ error: error.message });
+    
+    const flattened = receipts.map(r => ({
+      ...r,
+      total: r.orders?.total,
+      order_date: r.orders?.created_at
+    }));
+    
+    res.json(flattened);
+  });
+
+  app.get("/api/receipts/:id", async (req, res) => {
+    const { data: receipt, error } = await supabase
+      .from("receipts")
+      .select(`
+        *,
+        orders (
+          total,
+          tax,
+          discount,
+          payment_method,
+          user_id,
+          users (
+            username
+          )
+        )
+      `)
+      .eq("id", req.params.id)
+      .single();
+
+    if (error || !receipt) return res.status(404).json({ error: "Receipt not found" });
+
+    const { data: items, error: itemsError } = await supabase
+      .from("order_items")
+      .select(`
+        *,
+        products (
+          name,
+          sku
+        )
+      `)
+      .eq("order_id", receipt.order_id);
+
+    const { data: taxes, error: taxesError } = await supabase
+      .from("receipt_taxes")
+      .select("*")
+      .eq("receipt_id", receipt.id);
+
+    const flattenedItems = items?.map(i => ({
+      ...i,
+      name: i.products?.name,
+      sku: i.products?.sku
+    }));
+
+    res.json({ 
+      ...receipt, 
+      total: receipt.orders?.total,
+      tax: receipt.orders?.tax,
+      discount: receipt.orders?.discount,
+      payment_method: receipt.orders?.payment_method,
+      cashier_name: receipt.orders?.users?.username,
+      items: flattenedItems, 
+      taxes 
+    });
+  });
+
+  app.post("/api/orders", async (req, res) => {
+    const { total, tax, discount, payment_method, items, user_id } = req.body;
+    
+    try {
+      // Start a "transaction" via RPC or multiple calls (Supabase doesn't have multi-table transactions in JS SDK easily without RPC)
+      // For simplicity in this prototype, we'll do sequential calls.
+      
+      const { data: order, error: orderError } = await supabase
+        .from("orders")
+        .insert([{ total, tax, discount, payment_method, user_id }])
+        .select()
+        .single();
+
+      if (orderError) throw orderError;
+
+      const orderItems = items.map((item: any) => ({
+        order_id: order.id,
+        product_id: item.id,
+        quantity: item.quantity,
+        price: item.price
+      }));
+
+      const { error: itemsError } = await supabase
+        .from("order_items")
+        .insert(orderItems);
+
+      if (itemsError) throw itemsError;
+
+      // Update stock
       for (const item of items) {
-        db.prepare("INSERT INTO order_items (order_id, product_id, quantity, price) VALUES (?, ?, ?, ?)").run(orderId, item.id, item.quantity, item.price);
-        db.prepare("UPDATE products SET stock = stock - ? WHERE id = ?").run(item.quantity, item.id);
+        const { error: stockError } = await supabase.rpc('decrement_stock', { 
+          row_id: item.id, 
+          amount: item.quantity 
+        });
+        // If RPC doesn't exist, we'd do a manual update, but RPC is safer for concurrency
+        if (stockError) {
+           // Fallback if RPC not defined
+           await supabase
+             .from("products")
+             .update({ stock: item.stock - item.quantity })
+             .eq("id", item.id);
+        }
       }
 
-      // Create Customer Receipt
-      db.prepare("INSERT INTO receipts (id, order_id, type, status) VALUES (?, ?, ?, ?)").run(receiptId, orderId, 'customer', 'digital_only');
-      
-      // Add Tax breakdown (simple example)
-      db.prepare("INSERT INTO receipt_taxes (receipt_id, tax_name, rate, amount) VALUES (?, ?, ?, ?)").run(receiptId, 'VAT', 10, tax);
+      const receiptId = crypto.randomUUID();
+      const { error: receiptError } = await supabase
+        .from("receipts")
+        .insert([{ id: receiptId, order_id: order.id, type: 'customer', status: 'digital_only' }]);
 
-      return receiptId;
-    });
+      if (receiptError) throw receiptError;
 
-    try {
-      const id = transaction();
-      res.json({ id });
+      const { error: taxError } = await supabase
+        .from("receipt_taxes")
+        .insert([{ receipt_id: receiptId, tax_name: 'VAT', rate: 10, amount: tax }]);
+
+      if (taxError) throw taxError;
+
+      res.json({ id: receiptId });
     } catch (err: any) {
       res.status(400).json({ error: err.message });
     }
   });
 
-  app.get("/api/reports/daily", (req, res) => {
-    const sales = db.prepare(`
-      SELECT date(created_at) as date, sum(total) as revenue, count(*) as orders
-      FROM orders
-      GROUP BY date(created_at)
-      ORDER BY date DESC
-      LIMIT 7
-    `).all();
-    res.json(sales);
+  app.get("/api/reports/daily", async (req, res) => {
+    // In Supabase/Postgres, we use date_trunc or casting
+    const { data: sales, error } = await supabase
+      .from("orders")
+      .select("created_at, total");
+    
+    if (error) return res.status(400).json({ error: error.message });
+
+    // Group by date in JS for simplicity or use a view/RPC
+    const grouped = sales.reduce((acc: any, curr: any) => {
+      const date = new Date(curr.created_at).toISOString().split('T')[0];
+      if (!acc[date]) acc[date] = { date, revenue: 0, orders: 0 };
+      acc[date].revenue += curr.total;
+      acc[date].orders += 1;
+      return acc;
+    }, {});
+
+    const result = Object.values(grouped)
+      .sort((a: any, b: any) => b.date.localeCompare(a.date))
+      .slice(0, 7);
+
+    res.json(result);
   });
 
   // Vite middleware for development
