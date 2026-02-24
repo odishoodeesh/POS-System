@@ -27,8 +27,10 @@ export default function Categories() {
   const fetchCategories = async () => {
     try {
       const res = await fetch('/api/categories');
-      const data = await res.json();
-      setCategories(data);
+      if (res.ok) {
+        const data = await res.json();
+        setCategories(Array.isArray(data) ? data : []);
+      }
     } catch (err) {
       console.error('Failed to fetch categories', err);
     } finally {
@@ -78,9 +80,9 @@ export default function Categories() {
     }
   };
 
-  const filteredCategories = categories.filter(c => 
+  const filteredCategories = Array.isArray(categories) ? categories.filter(c => 
     c.name.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  ) : [];
 
   if (loading) {
     return (

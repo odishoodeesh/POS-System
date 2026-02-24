@@ -89,22 +89,12 @@ export default function ReceiptPreview({ receipt, settings, type = 'customer' }:
 
           {/* Summary */}
           <div className="space-y-1 mb-6">
-            <div className="flex justify-between">
-              <span>Subtotal</span>
-              <span>{formatCurrency(receipt.total - receipt.tax)}</span>
-            </div>
             {receipt.discount > 0 && (
               <div className="flex justify-between">
                 <span>Discount</span>
                 <span>-{formatCurrency(receipt.discount)}</span>
               </div>
             )}
-            {receipt.taxes.map(tax => (
-              <div key={tax.id} className="flex justify-between">
-                <span>{tax.tax_name} ({tax.rate}%)</span>
-                <span>{formatCurrency(tax.amount)}</span>
-              </div>
-            ))}
             <div className="flex justify-between text-lg font-black pt-2">
               <span>TOTAL</span>
               <span>{formatCurrency(receipt.total)}</span>

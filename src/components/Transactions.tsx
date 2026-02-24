@@ -28,8 +28,10 @@ export default function Transactions() {
   const fetchData = async () => {
     try {
       const receiptsRes = await fetch('/api/receipts/list');
-      const data = await receiptsRes.json();
-      setReceipts(data);
+      if (receiptsRes.ok) {
+        const data = await receiptsRes.json();
+        setReceipts(Array.isArray(data) ? data : []);
+      }
     } catch (err) {
       console.error(err);
     } finally {
@@ -76,7 +78,7 @@ export default function Transactions() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {receipts.map(r => (
+              {Array.isArray(receipts) && receipts.map(r => (
                 <tr key={r.id} className="hover:bg-gray-50 transition-colors group">
                   <td className="px-6 py-4 text-sm">
                     <div className="flex items-center gap-2">

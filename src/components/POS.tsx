@@ -85,10 +85,16 @@ export default function POS({ user }: POSProps) {
         fetch('/api/products'),
         fetch('/api/categories')
       ]);
-      const prods = await prodRes.json();
-      const cats = await catRes.json();
-      setProducts(prods);
-      setCategories(cats);
+      
+      if (prodRes.ok) {
+        const prods = await prodRes.json();
+        setProducts(Array.isArray(prods) ? prods : []);
+      }
+      
+      if (catRes.ok) {
+        const cats = await catRes.json();
+        setCategories(Array.isArray(cats) ? cats : []);
+      }
     } catch (err) {
       console.error('Failed to fetch data', err);
     } finally {
@@ -97,6 +103,7 @@ export default function POS({ user }: POSProps) {
   };
 
   const filteredProducts = useMemo(() => {
+    if (!Array.isArray(products)) return [];
     return products.filter(p => {
       const matchesCategory = selectedCategory ? p.category_id === selectedCategory : true;
       const matchesSearch = p.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
@@ -120,8 +127,7 @@ export default function POS({ user }: POSProps) {
   };
 
   const cartTotal = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-  const tax = cartTotal * 0.1; // 10% tax
-  const finalTotal = cartTotal + tax;
+  const finalTotal = cartTotal;
 
   const handleCheckout = useCallback(async (method?: 'cash' | 'card') => {
     const finalMethod = method || paymentMethod;
@@ -135,7 +141,7 @@ export default function POS({ user }: POSProps) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           total: finalTotal,
-          tax,
+          tax: 0,
           discount: 0,
           payment_method: finalMethod,
           items: cart,
@@ -159,7 +165,7 @@ export default function POS({ user }: POSProps) {
     } finally {
       setLoading(false);
     }
-  }, [paymentMethod, finalTotal, tax, cart, user.id, fetchData]);
+  }, [paymentMethod, finalTotal, cart, user.id, fetchData]);
 
   const resetPOS = useCallback(() => {
     setOrderComplete(false);
@@ -330,14 +336,6 @@ export default function POS({ user }: POSProps) {
         </div>
 
         <div className="p-6 bg-gray-50 border-t border-gray-100 space-y-3">
-          <div className="flex justify-between text-gray-500">
-            <span>Subtotal</span>
-            <span>{formatCurrency(cartTotal)}</span>
-          </div>
-          <div className="flex justify-between text-gray-500">
-            <span>Tax (10%)</span>
-            <span>{formatCurrency(tax)}</span>
-          </div>
           <div className="flex justify-between text-2xl font-bold pt-2 border-t border-gray-200">
             <span>Total</span>
             <span>{formatCurrency(finalTotal)}</span>
@@ -463,10 +461,6 @@ export default function POS({ user }: POSProps) {
                   </div>
 
                   <div className="bg-gray-50 p-6 rounded-3xl mb-8 space-y-2">
-                    <div className="flex justify-between text-gray-500">
-                      <span>Amount Due</span>
-                      <span>{formatCurrency(finalTotal)}</span>
-                    </div>
                     <div className="flex justify-between text-xl font-bold pt-2 border-t border-gray-200">
                       <span>Total</span>
                       <span>{formatCurrency(finalTotal)}</span>

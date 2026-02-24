@@ -93,22 +93,13 @@ export default function ReceiptSettingsPanel() {
                   className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-black outline-none transition-all h-20"
                 />
               </div>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Phone</label>
                   <input
                     type="text"
                     value={settings.phone}
                     onChange={e => setSettings({ ...settings, phone: e.target.value })}
-                    className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-black outline-none transition-all"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Tax ID / VAT</label>
-                  <input
-                    type="text"
-                    value={settings.tax_id}
-                    onChange={e => setSettings({ ...settings, tax_id: e.target.value })}
                     className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-black outline-none transition-all"
                   />
                 </div>
@@ -148,7 +139,6 @@ export default function ReceiptSettingsPanel() {
             <h3 className="text-lg font-bold">Display Options</h3>
             <div className="grid grid-cols-1 gap-4">
               {[
-                { key: 'show_tax', label: 'Show Tax Breakdown' },
                 { key: 'show_cashier', label: 'Show Cashier Name' },
                 { key: 'show_sku', label: 'Show Item SKU' },
               ].map(opt => (

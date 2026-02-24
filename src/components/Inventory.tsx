@@ -62,8 +62,16 @@ export default function Inventory() {
         fetch('/api/products'),
         fetch('/api/categories')
       ]);
-      setProducts(await prodRes.json());
-      setCategories(await catRes.json());
+      
+      if (prodRes.ok) {
+        const prods = await prodRes.json();
+        setProducts(Array.isArray(prods) ? prods : []);
+      }
+      
+      if (catRes.ok) {
+        const cats = await catRes.json();
+        setCategories(Array.isArray(cats) ? cats : []);
+      }
     } catch (err) {
       console.error(err);
     } finally {
@@ -160,10 +168,10 @@ export default function Inventory() {
     setIsAdding(true);
   };
 
-  const filteredProducts = products.filter(p => 
+  const filteredProducts = Array.isArray(products) ? products.filter(p => 
     p.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
     p.sku.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  ) : [];
 
   return (
     <div className="space-y-6">
