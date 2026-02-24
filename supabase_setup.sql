@@ -144,10 +144,10 @@ CREATE TABLE IF NOT EXISTS pages (
 -- SEED DATA
 
 -- Initial User (Admin@admin.com/12345678)
--- Note: You must create the user in Supabase Auth first, then add their ID here.
--- This is a placeholder for manual insertion after Auth setup.
--- INSERT INTO users (id, username, role, pin) 
--- VALUES ('AUTH_USER_ID_HERE', 'Admin@admin.com', 'owner', '1234');
+-- Note: This user must be created in Supabase Auth first with the ID below.
+INSERT INTO users (id, username, role, pin) 
+VALUES ('4676c6c0-84fd-4338-89b8-06aca5bc61f6', 'Admin@admin.com', 'owner', '1234')
+ON CONFLICT (id) DO NOTHING;
 
 -- Initial Categories
 INSERT INTO categories (name) VALUES ('Beverages'), ('Food'), ('Merchandise')
