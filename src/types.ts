@@ -1,5 +1,5 @@
 export interface User {
-  id: number;
+  id: string;
   username: string;
   role: 'owner' | 'manager' | 'cashier';
   pin: string;
@@ -33,7 +33,7 @@ export interface Order {
   discount: number;
   payment_method: string;
   created_at: string;
-  user_id: number;
+  user_id: string;
 }
 
 export interface Receipt {

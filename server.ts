@@ -27,19 +27,42 @@ app.use(express.json());
 
 // Auth
 app.post("/api/auth/login", async (req, res) => {
-  const { username, password } = req.body;
-  const { data: user, error } = await supabase
-    .from("users")
-    .select("*")
-    .eq("username", username)
-    .eq("password", password)
-    .single();
+  const { username, password } = req.body; // username is email
+  
+  try {
+    const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
+      email: username,
+      password: password,
+    });
 
-  if (user) {
-    const { password, ...userWithoutPassword } = user;
-    res.json(userWithoutPassword);
-  } else {
-    res.status(401).json({ error: "Invalid credentials" });
+    if (authError) {
+      return res.status(401).json({ error: authError.message });
+    }
+
+    if (authData.user) {
+      // Fetch profile data from our custom 'users' table
+      const { data: profile, error: profileError } = await supabase
+        .from("users")
+        .select("*")
+        .eq("id", authData.user.id)
+        .single();
+
+      // If profile doesn't exist, we might want to create it or just return auth user
+      // For this app, we expect the profile to exist or we return the auth user as fallback
+      const responseUser = {
+        ...authData.user,
+        ...(profile || {}),
+        username: profile?.username || authData.user.email,
+        id: authData.user.id
+      };
+
+      res.json(responseUser);
+    } else {
+      res.status(401).json({ error: "Authentication failed" });
+    }
+  } catch (err) {
+    console.error("Login error:", err);
+    res.status(500).json({ error: "Internal server error" });
   }
 });
 
