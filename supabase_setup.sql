@@ -144,9 +144,9 @@ CREATE TABLE IF NOT EXISTS pages (
 
 -- SEED DATA
 
--- Initial User (admin/password)
+-- Initial User (Admin@admin.com/12345678)
 INSERT INTO users (username, password, role, pin) 
-VALUES ('admin', 'password', 'owner', '1234')
+VALUES ('Admin@admin.com', '12345678', 'owner', '1234')
 ON CONFLICT (username) DO NOTHING;
 
 -- Initial Categories

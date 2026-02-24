@@ -64,7 +64,7 @@ export default function Login({ onLogin }: LoginProps) {
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
                   className="w-full pl-10 pr-4 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-black focus:border-transparent transition-all outline-none"
-                  placeholder="admin"
+                  placeholder="Admin@admin.com"
                   required
                 />
               </div>
