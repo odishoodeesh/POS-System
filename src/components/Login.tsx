@@ -8,6 +8,7 @@ interface LoginProps {
 }
 
 export default function Login({ onLogin }: LoginProps) {
+  const [isSignUp, setIsSignUp] = useState(false);
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -18,18 +19,22 @@ export default function Login({ onLogin }: LoginProps) {
     setLoading(true);
     setError('');
 
+    const endpoint = isSignUp ? '/api/auth/signup' : '/api/auth/login';
+    const payload = { username, password };
+
     try {
-      const response = await fetch('/api/auth/login', {
+      const response = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username, password }),
+        body: JSON.stringify(payload),
       });
 
       if (response.ok) {
         const user = await response.json();
         onLogin(user);
       } else {
-        setError('Invalid username or password');
+        const data = await response.json();
+        setError(data.error || (isSignUp ? 'Signup failed' : 'Invalid username or password'));
       }
     } catch (err) {
       setError('Connection error. Please try again.');
@@ -50,17 +55,19 @@ export default function Login({ onLogin }: LoginProps) {
             <Lock size={32} />
           </div>
           <h1 className="text-3xl font-bold tracking-tight">CloudPOS Pro</h1>
-          <p className="text-gray-500 mt-2">Sign in to your terminal</p>
+          <p className="text-gray-500 mt-2">
+            {isSignUp ? 'Create your terminal account' : 'Sign in to your terminal'}
+          </p>
         </div>
 
         <div className="bg-white p-8 rounded-3xl shadow-xl border border-gray-100">
           <form onSubmit={handleSubmit} className="space-y-6">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Username</label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Email Address</label>
               <div className="relative">
                 <UserIcon className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
                 <input
-                  type="text"
+                  type="email"
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
                   className="w-full pl-10 pr-4 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-black focus:border-transparent transition-all outline-none"
@@ -94,9 +101,21 @@ export default function Login({ onLogin }: LoginProps) {
               disabled={loading}
               className="w-full bg-black text-white py-4 rounded-xl font-semibold hover:bg-gray-900 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
             >
-              {loading ? <Loader2 className="animate-spin" size={20} /> : 'Sign In'}
+              {loading ? <Loader2 className="animate-spin" size={20} /> : (isSignUp ? 'Create Account' : 'Sign In')}
             </button>
           </form>
+
+          <div className="mt-6 text-center">
+            <button 
+              onClick={() => {
+                setIsSignUp(!isSignUp);
+                setError('');
+              }}
+              className="text-sm font-medium text-gray-500 hover:text-black transition-colors"
+            >
+              {isSignUp ? 'Already have an account? Sign In' : "Don't have an account? Sign Up"}
+            </button>
+          </div>
         </div>
 
         <p className="text-center text-gray-400 text-xs mt-8">

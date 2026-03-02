@@ -26,6 +26,51 @@ app.use(express.json());
 // API Routes
 
 // Auth
+app.post("/api/auth/signup", async (req, res) => {
+  const { username, password } = req.body; // username is email
+  
+  try {
+    const { data: authData, error: authError } = await supabase.auth.signUp({
+      email: username,
+      password: password,
+    });
+
+    if (authError) {
+      return res.status(400).json({ error: authError.message });
+    }
+
+    if (authData.user) {
+      // Create profile data in our custom 'users' table
+      const { error: profileError } = await supabase
+        .from("users")
+        .insert([{
+          id: authData.user.id,
+          username: username,
+          role: 'staff' // Default role
+        }]);
+
+      if (profileError) {
+        console.error("Profile creation error:", profileError);
+        return res.status(400).json({ error: "User created but profile setup failed: " + profileError.message });
+      }
+
+      const responseUser = {
+        ...authData.user,
+        username: username,
+        role: 'staff',
+        id: authData.user.id
+      };
+
+      res.json(responseUser);
+    } else {
+      res.status(400).json({ error: "Signup failed" });
+    }
+  } catch (err) {
+    console.error("Signup error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
 app.post("/api/auth/login", async (req, res) => {
   const { username, password } = req.body; // username is email
   

@@ -2,7 +2,6 @@ export interface User {
   id: string;
   username: string;
   role: 'owner' | 'manager' | 'cashier';
-  pin: string;
 }
 
 export interface Category {
