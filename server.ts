@@ -30,6 +30,7 @@ app.post("/api/auth/signup", async (req, res) => {
   const { username, password } = req.body; // username is email
   
   try {
+    // 1. Create the user in Supabase Auth
     const { data: authData, error: authError } = await supabase.auth.signUp({
       email: username,
       password: password,
@@ -40,24 +41,29 @@ app.post("/api/auth/signup", async (req, res) => {
     }
 
     if (authData.user) {
-      // Create profile data in our custom 'users' table
-      const { error: profileError } = await supabase
-        .from("users")
-        .insert([{
-          id: authData.user.id,
-          username: username,
-          role: 'staff' // Default role
-        }]);
+      // Check if email confirmation is required
+      const isConfirmationRequired = authData.session === null;
 
-      if (profileError) {
-        console.error("Profile creation error:", profileError);
-        return res.status(400).json({ error: "User created but profile setup failed: " + profileError.message });
+      if (isConfirmationRequired) {
+        return res.json({ 
+          message: "Signup successful! Please check your email to confirm your account.",
+          confirmationRequired: true 
+        });
       }
+
+      // If no confirmation required, the trigger has already created the profile.
+      // We fetch it to return the full user object.
+      const { data: profile } = await supabase
+        .from("users")
+        .select("*")
+        .eq("id", authData.user.id)
+        .single();
 
       const responseUser = {
         ...authData.user,
+        ...(profile || {}),
         username: username,
-        role: 'staff',
+        role: profile?.role || 'staff',
         id: authData.user.id
       };
 

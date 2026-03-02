@@ -29,11 +29,16 @@ export default function Login({ onLogin }: LoginProps) {
         body: JSON.stringify(payload),
       });
 
+      const data = await response.json();
+
       if (response.ok) {
-        const user = await response.json();
-        onLogin(user);
+        if (data.confirmationRequired) {
+          setError(data.message); // Show confirmation message as a "success" notice
+          setIsSignUp(false); // Switch back to login
+        } else {
+          onLogin(data);
+        }
       } else {
-        const data = await response.json();
         setError(data.error || (isSignUp ? 'Signup failed' : 'Invalid username or password'));
       }
     } catch (err) {
