@@ -315,7 +315,7 @@ CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS TRIGGER AS $$
 BEGIN
   INSERT INTO public.users (id, username, role)
-  VALUES (new.id, new.email, 'staff');
+  VALUES (new.id, new.email, 'owner');
   RETURN new;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
