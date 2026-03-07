@@ -20,23 +20,26 @@ if (!supabaseUrl) {
 }
 if (!supabaseKey) {
   console.error("CRITICAL: Supabase Key (Service Role or Anon) is not defined.");
-} else if (supabaseKey.startsWith("sb_publishable_") || supabaseKey.startsWith("pk_")) {
-  console.error("CRITICAL: It looks like you've provided a Stripe key instead of a Supabase key.");
-} else if (!supabaseKey.includes(".")) {
-  console.error("CRITICAL: The Supabase key provided does not look like a valid JWT. It should contain periods.");
 }
-
-console.log("Supabase initialized with URL:", supabaseUrl);
-console.log("Supabase Key type:", process.env.SUPABASE_SERVICE_ROLE_KEY ? "Service Role" : (process.env.VITE_SUPABASE_ANON_KEY ? "Anon" : "None"));
 
 // Use a single client for server-side operations. 
 // If it's the SERVICE_ROLE_KEY, it will bypass RLS.
-const supabase = createClient(supabaseUrl, supabaseKey, {
-  auth: {
-    autoRefreshToken: false,
-    persistSession: false
+let supabase: any;
+try {
+  if (supabaseUrl && supabaseKey) {
+    supabase = createClient(supabaseUrl, supabaseKey, {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false
+      }
+    });
+    console.log("Supabase client initialized successfully.");
+  } else {
+    console.warn("Supabase client NOT initialized due to missing configuration.");
   }
-});
+} catch (err) {
+  console.error("Failed to initialize Supabase client:", err);
+}
 
 const app = express();
 app.use(express.json());
@@ -44,6 +47,16 @@ app.use(express.json());
 // Request logging
 app.use((req, res, next) => {
   console.log(`${new Date().toISOString()} - ${req.method} ${req.url}`);
+  next();
+});
+
+// Check Supabase initialization
+app.use("/api", (req, res, next) => {
+  if (!supabase && req.path !== "/debug/status") {
+    return res.status(503).json({ 
+      error: "Supabase client is not initialized. Please check your environment variables (VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY)." 
+    });
+  }
   next();
 });
 
@@ -70,7 +83,7 @@ app.get("/api/auth/google/url", async (req, res) => {
     
     // Use the anon key for OAuth if possible, as it's a public operation
     const anonKey = (process.env.VITE_SUPABASE_ANON_KEY || "").trim();
-    const authClient = anonKey ? createClient(supabaseUrl, anonKey) : supabase;
+    const authClient = (anonKey && supabaseUrl) ? createClient(supabaseUrl, anonKey) : supabase;
 
     const { data, error } = await authClient.auth.signInWithOAuth({
       provider: 'google',

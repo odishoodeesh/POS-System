@@ -98,32 +98,39 @@ export default function Login({ onLogin }: LoginProps) {
     setError('');
     try {
       const res = await fetch('/api/auth/google/url');
-      const data = await res.json();
+      const contentType = res.headers.get("content-type");
       
-      if (!res.ok) {
-        throw new Error(data.error || 'Failed to get Google Auth URL');
-      }
-      
-      const { url } = data;
-      
-      // Open popup
-      const width = 500;
-      const height = 600;
-      const left = window.screenX + (window.outerWidth - width) / 2;
-      const top = window.screenY + (window.outerHeight - height) / 2;
-      
-      const popup = window.open(
-        url,
-        'google_login',
-        `width=${width},height=${height},left=${left},top=${top}`
-      );
-      
-      if (!popup) {
-        setError('Popup blocked. Please allow popups for this site.');
+      if (contentType && contentType.includes("application/json")) {
+        const data = await res.json();
+        if (!res.ok) {
+          throw new Error(data.error || 'Failed to get Google Auth URL');
+        }
+        
+        const { url } = data;
+        
+        // Open popup
+        const width = 500;
+        const height = 600;
+        const left = window.screenX + (window.outerWidth - width) / 2;
+        const top = window.screenY + (window.outerHeight - height) / 2;
+        
+        const popup = window.open(
+          url,
+          'google_login',
+          `width=${width},height=${height},left=${left},top=${top}`
+        );
+        
+        if (!popup) {
+          setError('Popup blocked. Please allow popups for this site.');
+        }
+      } else {
+        const text = await res.text();
+        console.error("Non-JSON response received from Google Auth URL:", text.substring(0, 200));
+        setError(`Server error (${res.status}). The server might be starting up or misconfigured.`);
       }
     } catch (err: any) {
       console.error('Google login error:', err);
-      setError(err.message || 'Failed to start Google login');
+      setError(err.message || 'Connection error. Please check if the server is running.');
     } finally {
       setLoading(false);
     }
