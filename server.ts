@@ -1,9 +1,7 @@
 import express from "express";
-import { createServer as createViteServer } from "vite";
 import { createClient } from "@supabase/supabase-js";
 import path from "path";
 import { fileURLToPath } from "url";
-import crypto from "crypto";
 import dotenv from "dotenv";
 
 dotenv.config();
@@ -42,6 +40,12 @@ const supabase = createClient(supabaseUrl, supabaseKey, {
 
 const app = express();
 app.use(express.json());
+
+// Request logging
+app.use((req, res, next) => {
+  console.log(`${new Date().toISOString()} - ${req.method} ${req.url}`);
+  next();
+});
 
 // API Routes
 
@@ -559,7 +563,7 @@ if (process.env.NODE_ENV !== "production") {
   });
 }
 
-const PORT = Number(process.env.PORT) || 3000;
+const PORT = 3000;
 app.listen(PORT, "0.0.0.0", () => {
   console.log(`Server running on port ${PORT}`);
   console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);

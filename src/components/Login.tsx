@@ -51,21 +51,31 @@ export default function Login({ onLogin }: LoginProps) {
         body: JSON.stringify(payload),
       });
 
-      const data = await response.json();
-      console.log(`${isSignUp ? 'Signup' : 'Login'} response:`, data);
+      console.log(`Response status: ${response.status}`);
+      const contentType = response.headers.get("content-type");
+      
+      if (contentType && contentType.includes("application/json")) {
+        const data = await response.json();
+        console.log(`${isSignUp ? 'Signup' : 'Login'} response:`, data);
 
-      if (response.ok) {
-        if (data.confirmationRequired) {
-          setError(data.message); // Show confirmation message as a "success" notice
-          setIsSignUp(false); // Switch back to login
+        if (response.ok) {
+          if (data.confirmationRequired) {
+            setError(data.message);
+            setIsSignUp(false);
+          } else {
+            onLogin(data);
+          }
         } else {
-          onLogin(data);
+          setError(data.error || (isSignUp ? 'Signup failed' : 'Invalid username or password'));
         }
       } else {
-        setError(data.error || (isSignUp ? 'Signup failed' : 'Invalid username or password'));
+        const text = await response.text();
+        console.error("Non-JSON response received:", text.substring(0, 200));
+        setError(`Server error (${response.status}). The server might be starting up or misconfigured.`);
       }
     } catch (err) {
-      setError('Connection error. Please try again.');
+      console.error("Fetch error:", err);
+      setError('Connection error. Please check your internet or if the server is running.');
     } finally {
       setLoading(false);
     }
