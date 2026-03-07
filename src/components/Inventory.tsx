@@ -13,12 +13,10 @@ import {
   Package,
   Scan,
   Image as ImageIcon,
-  Upload,
-  Sparkles
+  Upload
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { formatCurrency } from '../utils/format';
-import { generateProductImage } from '../services/geminiService';
 
 export default function Inventory() {
   const [products, setProducts] = useState<Product[]>([]);
@@ -53,7 +51,6 @@ export default function Inventory() {
     image_url: ''
   });
   const [uploading, setUploading] = useState(false);
-  const [generatingImage, setGeneratingImage] = useState(false);
 
   useEffect(() => {
     fetchData();
@@ -103,23 +100,6 @@ export default function Inventory() {
       console.error('Upload failed', err);
     } finally {
       setUploading(false);
-    }
-  };
-
-  const handleGenerateAIImage = async () => {
-    if (!formData.name) {
-      alert("Please enter a product name first.");
-      return;
-    }
-    setGeneratingImage(true);
-    try {
-      const imageUrl = await generateProductImage(formData.name);
-      setFormData(prev => ({ ...prev, image_url: imageUrl }));
-    } catch (err) {
-      console.error("AI Image Generation failed", err);
-      alert("Failed to generate AI image. Please try again.");
-    } finally {
-      setGeneratingImage(false);
     }
   };
 
@@ -417,7 +397,7 @@ export default function Inventory() {
                       <div className="w-24 h-24 rounded-2xl bg-gray-50 border-2 border-dashed border-gray-200 flex items-center justify-center overflow-hidden relative group">
                         {formData.image_url ? (
                           <img src={formData.image_url} alt="Preview" className="w-full h-full object-cover" />
-                        ) : uploading || generatingImage ? (
+                        ) : uploading ? (
                           <Loader2 className="animate-spin text-gray-400" />
                         ) : (
                           <ImageIcon size={32} className="text-gray-300" />
@@ -428,18 +408,7 @@ export default function Inventory() {
                         </label>
                       </div>
                       <div className="flex-1">
-                        <div className="flex items-center justify-between mb-2">
-                          <p className="text-xs text-gray-500">Upload a product photo or generate one with AI.</p>
-                          <button
-                            type="button"
-                            onClick={handleGenerateAIImage}
-                            disabled={generatingImage || !formData.name}
-                            className="text-xs font-bold text-indigo-600 hover:text-indigo-700 flex items-center gap-1 disabled:opacity-50 transition-colors"
-                          >
-                            <Sparkles size={12} />
-                            Generate with AI
-                          </button>
-                        </div>
+                        <p className="text-xs text-gray-500 mb-2">Upload a product photo. Recommended size: 512x512px.</p>
                         <input
                           type="text"
                           placeholder="Or paste image URL..."
