@@ -66,7 +66,13 @@ app.get("/api/auth/google/url", async (req, res) => {
     const appUrl = process.env.APP_URL || `http://localhost:3000`;
     const redirectUri = `${appUrl}/api/auth/callback`;
     
-    const { data, error } = await supabase.auth.signInWithOAuth({
+    console.log(`Generating Google Auth URL with redirect: ${redirectUri}`);
+    
+    // Use the anon key for OAuth if possible, as it's a public operation
+    const anonKey = (process.env.VITE_SUPABASE_ANON_KEY || "").trim();
+    const authClient = anonKey ? createClient(supabaseUrl, anonKey) : supabase;
+
+    const { data, error } = await authClient.auth.signInWithOAuth({
       provider: 'google',
       options: {
         redirectTo: redirectUri,
@@ -74,11 +80,19 @@ app.get("/api/auth/google/url", async (req, res) => {
       }
     });
 
-    if (error) throw error;
+    if (error) {
+      console.error("Supabase OAuth Error:", error);
+      throw error;
+    }
+    
+    if (!data || !data.url) {
+      throw new Error("No URL returned from Supabase OAuth");
+    }
+
     res.json({ url: data.url });
   } catch (err: any) {
     console.error("Google Auth URL error:", err);
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: err.message || "Failed to generate Google Auth URL" });
   }
 });
 

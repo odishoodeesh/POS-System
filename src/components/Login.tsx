@@ -98,8 +98,13 @@ export default function Login({ onLogin }: LoginProps) {
     setError('');
     try {
       const res = await fetch('/api/auth/google/url');
-      if (!res.ok) throw new Error('Failed to get Google Auth URL');
-      const { url } = await res.json();
+      const data = await res.json();
+      
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to get Google Auth URL');
+      }
+      
+      const { url } = data;
       
       // Open popup
       const width = 500;
