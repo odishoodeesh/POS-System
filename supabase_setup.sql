@@ -177,62 +177,67 @@ ALTER TABLE pages ENABLE ROW LEVEL SECURITY;
 CREATE OR REPLACE FUNCTION get_my_role()
 RETURNS TEXT AS $$
 BEGIN
-  RETURN (SELECT role FROM users WHERE id = auth.uid());
+  RETURN (SELECT role FROM public.users WHERE id = auth.uid());
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 -- Users Policies
--- Allow users to see their own profile
 CREATE POLICY "Users can view their own profile" ON users FOR SELECT USING (auth.uid() = id);
--- Allow service role to manage all users (default, but explicit for clarity)
-CREATE POLICY "Service role can manage all users" ON users FOR ALL TO service_role USING (true);
--- Allow owners to manage all users
 CREATE POLICY "Owners can manage all users" ON users FOR ALL TO authenticated USING (get_my_role() = 'owner');
--- Allow initial insert during signup (if trigger is not used or as a fallback)
-CREATE POLICY "Allow individual insert during signup" ON users FOR INSERT WITH CHECK (auth.uid() = id OR id IS NOT NULL);
+CREATE POLICY "Managers can view all users" ON users FOR SELECT TO authenticated USING (get_my_role() = 'manager');
+CREATE POLICY "Allow system to insert users" ON users FOR INSERT WITH CHECK (true); -- Handled by trigger or service role
 
--- Categories & Products
+-- Categories
 CREATE POLICY "Anyone authenticated can view categories" ON categories FOR SELECT TO authenticated USING (true);
 CREATE POLICY "Managers and Owners can manage categories" ON categories FOR ALL TO authenticated USING (get_my_role() IN ('owner', 'manager'));
 
+-- Products
 CREATE POLICY "Anyone authenticated can view products" ON products FOR SELECT TO authenticated USING (true);
 CREATE POLICY "Managers and Owners can manage products" ON products FOR ALL TO authenticated USING (get_my_role() IN ('owner', 'manager'));
 
--- Orders & Receipts
+-- Orders
 CREATE POLICY "Anyone authenticated can view orders" ON orders FOR SELECT TO authenticated USING (true);
 CREATE POLICY "Anyone authenticated can create orders" ON orders FOR INSERT TO authenticated WITH CHECK (true);
-CREATE POLICY "Owners and Managers can delete orders" ON orders FOR DELETE TO authenticated USING (get_my_role() IN ('owner', 'manager'));
+CREATE POLICY "Owners and Managers can manage orders" ON orders FOR ALL TO authenticated USING (get_my_role() IN ('owner', 'manager'));
 
+-- Order Items
 CREATE POLICY "Anyone authenticated can view order items" ON order_items FOR SELECT TO authenticated USING (true);
 CREATE POLICY "Anyone authenticated can create order items" ON order_items FOR INSERT TO authenticated WITH CHECK (true);
+CREATE POLICY "Owners and Managers can manage order items" ON order_items FOR ALL TO authenticated USING (get_my_role() IN ('owner', 'manager'));
 
+-- Receipt Settings
+CREATE POLICY "Anyone authenticated can view receipt settings" ON receipt_settings FOR SELECT TO authenticated USING (true);
+CREATE POLICY "Owners and Managers can manage receipt settings" ON receipt_settings FOR ALL TO authenticated USING (get_my_role() IN ('owner', 'manager'));
+
+-- Receipts
 CREATE POLICY "Anyone authenticated can view receipts" ON receipts FOR SELECT TO authenticated USING (true);
-CREATE POLICY "Anyone authenticated can create receipts" ON receipts FOR INSERT TO authenticated WITH CHECK (true);
+CREATE POLICY "Anyone authenticated can manage receipts" ON receipts FOR ALL TO authenticated USING (true);
 
+-- Receipt Taxes
 CREATE POLICY "Anyone authenticated can view receipt taxes" ON receipt_taxes FOR SELECT TO authenticated USING (true);
-CREATE POLICY "Anyone authenticated can create receipt taxes" ON receipt_taxes FOR INSERT TO authenticated WITH CHECK (true);
+CREATE POLICY "Anyone authenticated can manage receipt taxes" ON receipt_taxes FOR ALL TO authenticated USING (true);
 
--- Settings
-CREATE POLICY "Anyone authenticated can view settings" ON receipt_settings FOR SELECT TO authenticated USING (true);
-CREATE POLICY "Owners can manage receipt settings" ON receipt_settings FOR ALL TO authenticated USING (get_my_role() = 'owner');
-
-CREATE POLICY "Public can view site settings" ON site_settings FOR SELECT TO public USING (true);
-CREATE POLICY "Owners can manage site settings" ON site_settings FOR ALL TO authenticated USING (get_my_role() = 'owner');
-
--- Blog & Pages
+-- Blog Posts
 CREATE POLICY "Public can view published blog posts" ON blog_posts FOR SELECT TO public USING (status = 'published');
 CREATE POLICY "Authenticated can view all blog posts" ON blog_posts FOR SELECT TO authenticated USING (true);
 CREATE POLICY "Managers and Owners can manage blog posts" ON blog_posts FOR ALL TO authenticated USING (get_my_role() IN ('owner', 'manager'));
 
+-- Blog Categories
 CREATE POLICY "Public can view blog categories" ON blog_categories FOR SELECT TO public USING (true);
 CREATE POLICY "Managers and Owners can manage blog categories" ON blog_categories FOR ALL TO authenticated USING (get_my_role() IN ('owner', 'manager'));
 
+-- Blog Post Categories
 CREATE POLICY "Public can view blog post categories" ON blog_post_categories FOR SELECT TO public USING (true);
 CREATE POLICY "Managers and Owners can manage blog post categories" ON blog_post_categories FOR ALL TO authenticated USING (get_my_role() IN ('owner', 'manager'));
 
+-- Site Settings
+CREATE POLICY "Public can view site settings" ON site_settings FOR SELECT TO public USING (true);
+CREATE POLICY "Owners and Managers can manage site settings" ON site_settings FOR ALL TO authenticated USING (get_my_role() IN ('owner', 'manager'));
+
+-- Pages
 CREATE POLICY "Public can view published pages" ON pages FOR SELECT TO public USING (is_published = true);
 CREATE POLICY "Authenticated can view all pages" ON pages FOR SELECT TO authenticated USING (true);
-CREATE POLICY "Owners can manage pages" ON pages FOR ALL TO authenticated USING (get_my_role() = 'owner');
+CREATE POLICY "Owners and Managers can manage pages" ON pages FOR ALL TO authenticated USING (get_my_role() IN ('owner', 'manager'));
 
 -- 5. SEED DATA
 
