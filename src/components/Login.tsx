@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { User } from '../types';
 import { Lock, User as UserIcon, Loader2 } from 'lucide-react';
 import { motion } from 'motion/react';
@@ -13,6 +13,27 @@ export default function Login({ onLogin }: LoginProps) {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [configStatus, setConfigStatus] = useState<{
+    supabaseUrl: boolean;
+    supabaseAnonKey: boolean;
+    supabaseServiceKey: boolean;
+  } | null>(null);
+
+  useEffect(() => {
+    checkConfig();
+  }, []);
+
+  const checkConfig = async () => {
+    try {
+      const res = await fetch('/api/debug/status');
+      if (res.ok) {
+        const data = await res.json();
+        setConfigStatus(data);
+      }
+    } catch (err) {
+      console.error('Failed to check config status', err);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -101,6 +122,21 @@ export default function Login({ onLogin }: LoginProps) {
 
             {error && (
               <p className="text-red-500 text-sm font-medium text-center">{error}</p>
+            )}
+
+            {configStatus && (!configStatus.supabaseUrl || !configStatus.supabaseServiceKey) && (
+              <div className="p-4 bg-amber-50 border border-amber-200 rounded-xl">
+                <p className="text-amber-800 text-xs font-medium">
+                  ⚠️ Configuration Warning:
+                </p>
+                <ul className="text-amber-700 text-[10px] mt-1 list-disc list-inside">
+                  {!configStatus.supabaseUrl && <li>VITE_SUPABASE_URL is missing</li>}
+                  {!configStatus.supabaseServiceKey && <li>SUPABASE_SERVICE_ROLE_KEY is missing</li>}
+                </ul>
+                <p className="text-amber-600 text-[9px] mt-2">
+                  Please add these to your AI Studio environment variables.
+                </p>
+              </div>
             )}
 
             <button

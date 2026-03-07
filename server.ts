@@ -11,8 +11,11 @@ dotenv.config();
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 // Initialize Supabase
-const supabaseUrl = process.env.VITE_SUPABASE_URL || "";
-const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SUPABASE_ANON_KEY || "";
+let supabaseUrl = (process.env.VITE_SUPABASE_URL || "").trim();
+if (supabaseUrl.endsWith("/")) {
+  supabaseUrl = supabaseUrl.slice(0, -1);
+}
+const supabaseKey = (process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SUPABASE_ANON_KEY || "").trim();
 
 if (!supabaseUrl) {
   console.error("CRITICAL: VITE_SUPABASE_URL is not defined in environment variables.");
@@ -26,7 +29,7 @@ if (!supabaseKey) {
 }
 
 console.log("Supabase initialized with URL:", supabaseUrl);
-console.log("Supabase Key type:", process.env.SUPABASE_SERVICE_ROLE_KEY ? "Service Role" : "Anon/Other");
+console.log("Supabase Key type:", process.env.SUPABASE_SERVICE_ROLE_KEY ? "Service Role" : (process.env.VITE_SUPABASE_ANON_KEY ? "Anon" : "None"));
 
 // Use a single client for server-side operations. 
 // If it's the SERVICE_ROLE_KEY, it will bypass RLS.
@@ -43,6 +46,16 @@ app.use(express.json());
 // API Routes
 
 // Auth
+app.get("/api/debug/status", (req, res) => {
+  res.json({
+    supabaseUrl: !!process.env.VITE_SUPABASE_URL,
+    supabaseAnonKey: !!process.env.VITE_SUPABASE_ANON_KEY,
+    supabaseServiceKey: !!process.env.SUPABASE_SERVICE_ROLE_KEY,
+    nodeEnv: process.env.NODE_ENV || 'development',
+    port: process.env.PORT || 3000
+  });
+});
+
 app.post("/api/auth/signup", async (req, res) => {
   const { username, password } = req.body; // username is email
   
@@ -54,7 +67,11 @@ app.post("/api/auth/signup", async (req, res) => {
     });
 
     if (authError) {
-      console.error("Supabase Signup Error:", authError);
+      console.error("Supabase Signup Error Detail:", {
+        message: authError.message,
+        status: authError.status,
+        name: authError.name
+      });
       return res.status(400).json({ error: authError.message });
     }
 
@@ -105,7 +122,11 @@ app.post("/api/auth/login", async (req, res) => {
     });
 
     if (authError) {
-      console.error("Supabase Login Error:", authError);
+      console.error("Supabase Login Error Detail:", {
+        message: authError.message,
+        status: authError.status,
+        name: authError.name
+      });
       return res.status(401).json({ error: authError.message });
     }
 
