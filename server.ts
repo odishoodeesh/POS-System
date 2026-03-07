@@ -17,8 +17,25 @@ const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SU
 if (!supabaseUrl) {
   console.error("CRITICAL: VITE_SUPABASE_URL is not defined in environment variables.");
 }
+if (!supabaseKey) {
+  console.error("CRITICAL: Supabase Key (Service Role or Anon) is not defined.");
+} else if (supabaseKey.startsWith("sb_publishable_") || supabaseKey.startsWith("pk_")) {
+  console.error("CRITICAL: It looks like you've provided a Stripe key instead of a Supabase key.");
+} else if (!supabaseKey.includes(".")) {
+  console.error("CRITICAL: The Supabase key provided does not look like a valid JWT. It should contain periods.");
+}
 
-const supabase = createClient(supabaseUrl, supabaseKey);
+console.log("Supabase initialized with URL:", supabaseUrl);
+console.log("Supabase Key type:", process.env.SUPABASE_SERVICE_ROLE_KEY ? "Service Role" : "Anon/Other");
+
+// Use a single client for server-side operations. 
+// If it's the SERVICE_ROLE_KEY, it will bypass RLS.
+const supabase = createClient(supabaseUrl, supabaseKey, {
+  auth: {
+    autoRefreshToken: false,
+    persistSession: false
+  }
+});
 
 const app = express();
 app.use(express.json());
@@ -37,6 +54,7 @@ app.post("/api/auth/signup", async (req, res) => {
     });
 
     if (authError) {
+      console.error("Supabase Signup Error:", authError);
       return res.status(400).json({ error: authError.message });
     }
 
@@ -87,6 +105,7 @@ app.post("/api/auth/login", async (req, res) => {
     });
 
     if (authError) {
+      console.error("Supabase Login Error:", authError);
       return res.status(401).json({ error: authError.message });
     }
 

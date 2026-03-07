@@ -176,12 +176,20 @@ ALTER TABLE pages ENABLE ROW LEVEL SECURITY;
 -- Helper function to get current user role
 CREATE OR REPLACE FUNCTION get_my_role()
 RETURNS TEXT AS $$
-  SELECT role FROM users WHERE id = auth.uid();
-$$ LANGUAGE sql SECURITY DEFINER;
+BEGIN
+  RETURN (SELECT role FROM users WHERE id = auth.uid());
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
 
 -- Users Policies
+-- Allow users to see their own profile
 CREATE POLICY "Users can view their own profile" ON users FOR SELECT USING (auth.uid() = id);
-CREATE POLICY "Owners can manage all users" ON users FOR ALL USING (get_my_role() = 'owner');
+-- Allow service role to manage all users (default, but explicit for clarity)
+CREATE POLICY "Service role can manage all users" ON users FOR ALL TO service_role USING (true);
+-- Allow owners to manage all users
+CREATE POLICY "Owners can manage all users" ON users FOR ALL TO authenticated USING (get_my_role() = 'owner');
+-- Allow initial insert during signup (if trigger is not used or as a fallback)
+CREATE POLICY "Allow individual insert during signup" ON users FOR INSERT WITH CHECK (auth.uid() = id OR id IS NOT NULL);
 
 -- Categories & Products
 CREATE POLICY "Anyone authenticated can view categories" ON categories FOR SELECT TO authenticated USING (true);

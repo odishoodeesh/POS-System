@@ -23,6 +23,7 @@ export default function Login({ onLogin }: LoginProps) {
     const payload = { username, password };
 
     try {
+      console.log(`Attempting ${isSignUp ? 'Signup' : 'Login'} to ${endpoint}...`);
       const response = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -30,6 +31,7 @@ export default function Login({ onLogin }: LoginProps) {
       });
 
       const data = await response.json();
+      console.log(`${isSignUp ? 'Signup' : 'Login'} response:`, data);
 
       if (response.ok) {
         if (data.confirmationRequired) {
