@@ -56,8 +56,91 @@ app.get("/api/debug/status", (req, res) => {
     supabaseAnonKey: !!process.env.VITE_SUPABASE_ANON_KEY,
     supabaseServiceKey: !!process.env.SUPABASE_SERVICE_ROLE_KEY,
     nodeEnv: process.env.NODE_ENV || 'development',
-    port: process.env.PORT || 3000
+    port: process.env.PORT || 3000,
+    appUrl: !!process.env.APP_URL
   });
+});
+
+app.get("/api/auth/google/url", async (req, res) => {
+  try {
+    const appUrl = process.env.APP_URL || `http://localhost:3000`;
+    const redirectUri = `${appUrl}/api/auth/callback`;
+    
+    const { data, error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo: redirectUri,
+        skipBrowserRedirect: true
+      }
+    });
+
+    if (error) throw error;
+    res.json({ url: data.url });
+  } catch (err: any) {
+    console.error("Google Auth URL error:", err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get("/api/auth/callback", async (req, res) => {
+  const { code } = req.query;
+  
+  if (!code) {
+    return res.status(400).send("No code provided");
+  }
+
+  try {
+    const { data, error } = await supabase.auth.exchangeCodeForSession(String(code));
+    
+    if (error) throw error;
+
+    // Fetch or ensure profile exists (the trigger should have handled it, but let's be safe)
+    let { data: profile } = await supabase
+      .from("users")
+      .select("*")
+      .eq("id", data.user.id)
+      .single();
+
+    if (!profile) {
+      // Fallback if trigger didn't run for some reason
+      const { data: newProfile } = await supabase
+        .from("users")
+        .insert([{ id: data.user.id, username: data.user.email, role: 'owner' }])
+        .select()
+        .single();
+      profile = newProfile;
+    }
+
+    const responseUser = {
+      ...data.user,
+      ...(profile || {}),
+      username: profile?.username || data.user.email,
+      id: data.user.id
+    };
+
+    // Send success message to parent window and close popup
+    res.send(`
+      <html>
+        <body>
+          <script>
+            if (window.opener) {
+              window.opener.postMessage({ 
+                type: 'OAUTH_AUTH_SUCCESS',
+                user: ${JSON.stringify(responseUser)}
+              }, '*');
+              window.close();
+            } else {
+              window.location.href = '/';
+            }
+          </script>
+          <p>Authentication successful. This window should close automatically.</p>
+        </body>
+      </html>
+    `);
+  } catch (err: any) {
+    console.error("Auth callback error:", err);
+    res.status(500).send(`Authentication failed: ${err.message}`);
+  }
 });
 
 app.post("/api/auth/signup", async (req, res) => {
